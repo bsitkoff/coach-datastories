@@ -1,0 +1,8 @@
+{
+  "name": "Data Stories Coach",
+  "type": "helper",
+  "properties": {
+    "user_type": "all", 
+    "component": "all"
+  }
+}

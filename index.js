@@ -98,8 +98,15 @@ Your students are learning to:
     // Get context from Codio (includes files, guides, assignments)
     const context = await codioIDE.coachBot.getContext()
 
+    // DEBUG: Show what context we received
+    codioIDE.coachBot.write("**DEBUG - Context received:**")
+    codioIDE.coachBot.write("```json\n" + JSON.stringify(context, null, 2) + "\n```")
+
     // Build additional context with CSV files
     const csvList = await tryGetCSVList()
+
+    // DEBUG: Show CSV list
+    codioIDE.coachBot.write("**DEBUG - CSV files found:** " + (csvList || "none"))
 
     // Build context string to include in first message
     let contextInfo = ""
@@ -117,9 +124,21 @@ Your students are learning to:
       contextInfo += "\n\n## Assignment Context:\n" + context.assignmentData
     }
 
+    // Add guides page if available
+    if (context.guidesPage) {
+      contextInfo += "\n\n## Guide Content:\n" + context.guidesPage
+    }
+
     // Add CSV files list
     if (csvList) {
       contextInfo += csvList
+    }
+
+    // DEBUG: Show what we're sending
+    if (contextInfo) {
+      codioIDE.coachBot.write("**DEBUG - Context info length:** " + contextInfo.length + " characters")
+    } else {
+      codioIDE.coachBot.write("**DEBUG - WARNING: No context info collected!**")
     }
 
     // the messages object that will contain the user prompt and/or any assistant responses to be sent to the LLM - will also maintain history

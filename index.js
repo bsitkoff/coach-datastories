@@ -134,25 +134,58 @@ Your students are learning to:
     return files
   }
 
-  // Build enhanced context with additional data files info
+  // Build enhanced context with Jupyter notebook and file info
   async function buildEnhancedContext(baseContext) {
     let enhanced = {...baseContext}
+    let contextInfo = ""
 
     try {
-      // Try to read workspace files directly (if API is available)
-      const workspaceFiles = await tryGetWorkspaceFiles()
+      // Check for open Jupyter notebooks
+      if (baseContext.jupyterContext && baseContext.jupyterContext.length > 0) {
+        if (DEBUG_MODE) {
+          codioIDE.coachBot.write(`**DEBUG - Found ${baseContext.jupyterContext.length} open Jupyter notebook(s)**`)
+        }
 
-      if (workspaceFiles) {
-        enhanced.workspaceFiles = workspaceFiles
+        // Access all open notebooks
+        for (let i = 0; i < baseContext.jupyterContext.length; i++) {
+          const notebook = baseContext.jupyterContext[i]
+          const notebookPath = notebook.path
+          const cells = notebook.content
+
+          if (DEBUG_MODE) {
+            codioIDE.coachBot.write(`**DEBUG - Notebook ${i}: ${notebookPath} with ${cells.length} cells**`)
+          }
+
+          contextInfo += `\n\n## Open Jupyter Notebook: ${notebookPath}\n`
+
+          // Extract code and markdown cells
+          cells.forEach((cell, index) => {
+            if (cell.type === 'code' || cell.type === 'markdown') {
+              contextInfo += `\n### Cell ${index + 1} (${cell.type}):\n\`\`\`\n${cell.source || ''}\n\`\`\`\n`
+            }
+          })
+        }
+      } else {
+        if (DEBUG_MODE) {
+          codioIDE.coachBot.write("**DEBUG - No Jupyter notebooks are currently open**")
+        }
       }
 
+      // Try to read workspace files directly (if API is available)
+      const workspaceFiles = await tryGetWorkspaceFiles()
+      if (workspaceFiles) {
+        contextInfo += "\n\n## Workspace Files:\n" + workspaceFiles
+      }
+
+      enhanced.notebookContext = contextInfo
+
       if (DEBUG_MODE) {
-        codioIDE.coachBot.write("**DEBUG - Enhanced context built successfully**")
+        codioIDE.coachBot.write(`**DEBUG - Enhanced context built: ${contextInfo.length} chars**`)
       }
 
     } catch (error) {
       if (DEBUG_MODE) {
-        codioIDE.coachBot.write(`**DEBUG - Could not enhance context: ${error.message}**`)
+        codioIDE.coachBot.write(`**DEBUG - Error building context: ${error.message}**`)
       }
     }
 
@@ -171,6 +204,13 @@ Your students are learning to:
     if (DEBUG_MODE) {
       codioIDE.coachBot.write("**DEBUG - Context received:**")
       codioIDE.coachBot.write("```json\n" + JSON.stringify(context, null, 2) + "\n```")
+    }
+
+    // Check if any Jupyter notebooks are open
+    if (!context.jupyterContext || context.jupyterContext.length === 0) {
+      codioIDE.coachBot.write("**📓 Please open a Jupyter notebook first!**\n\nI can help you better when I can see your code. Please open one of your notebook files (Step One, Step Two, etc.) and then click the coach button again.")
+      codioIDE.coachBot.showMenu()
+      return
     }
 
     // Build enhanced context with additional workspace files

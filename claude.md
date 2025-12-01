@@ -129,25 +129,76 @@ const result = await codioIDE.coachBot.ask({
 
 ---
 
+## BREAKTHROUGH DISCOVERY 🎯
+
+### The Real Issue
+The coach was using **`context.files`** but Jupyter notebooks are accessed via **`context.jupyterContext`**!
+
+**Key findings from testing:**
+```json
+{
+  "jupyterContext": [],  // Empty because NO notebooks were open!
+  "files": [],           // Not used for Jupyter
+  "guidesPage": {...},   // Works fine
+  "assignmentData": {...} // Works fine
+}
+```
+
+### How Jupyter Context Actually Works
+
+Based on [eCornell JupyterLab Summarize Assistant](https://github.com/codio-extensions/eCornell-JupyterLab-Summarize-Assistant):
+
+```javascript
+let context = await codioIDE.coachBot.getContext()
+
+// Access OPEN Jupyter notebooks (must be open in IDE!)
+let notebook = context.jupyterContext[0]  // First open notebook
+let notebookPath = notebook.path           // File path
+let cells = notebook.content               // Array of cells
+
+// Each cell has: type ('code' or 'markdown'), source, id
+```
+
+**Critical requirement:** Students must have notebooks **OPEN** in the IDE when clicking the coach button!
+
 ## Current Status
 
 ### ✅ Completed
-- [x] Fixed workspace API undefined error
+- [x] Fixed workspace API undefined error (commit: `0125a8c`)
 - [x] Added DEBUG_MODE configuration flag
-- [x] Refactored to use context parameter approach
-- [x] Committed and pushed to GitHub (commit: `0125a8c`)
+- [x] Researched Codio Coach API documentation
+- [x] Discovered jupyterContext is the correct approach (commit: `e415435`)
+- [x] Updated coach to properly access open Jupyter notebooks
+- [x] Added user-friendly message when no notebooks are open
+- [x] Extract all code and markdown cells from notebooks
 
-### ⏳ Testing Required
-The user mentioned that when they tested the template approach previously, it didn't work. With DEBUG_MODE enabled, we can now see:
-- What context is being received from `codioIDE.coachBot.getContext()`
-- Whether workspace files are being read successfully
-- How the context is being passed to the LLM
+### 🧪 Ready for Testing
+With DEBUG_MODE enabled, you'll now see:
+- Number of open Jupyter notebooks
+- Notebook paths and cell counts
+- Full cell contents (code and markdown)
+- Clear message if no notebooks are open
 
 ### 🔍 Next Steps
-1. User will test the coach with DEBUG_MODE enabled
-2. Review debug output to identify why context approach may not be working
-3. Adjust implementation based on actual API behavior
-4. Once working, set DEBUG_MODE to `false` for production use
+1. **Test:** Open a Jupyter notebook (Step One, Step Two, etc.)
+2. **Click:** "I have a question" button
+3. **Verify:** Debug output shows notebook was detected
+4. **Ask:** Question about the code (e.g., "What two datafiles does my code use?")
+5. **Success:** Coach should now see and reference your actual code!
+
+---
+
+## References & Sources
+
+### Official Documentation
+- [Codio Coach API Reference](https://codio.github.io/client/codioIDE.coachBot.html) - getContext() method documentation
+- [Virtual Coach Setup](https://docs.codio.com/instructors/setupcourses/assignment-settings/virtual-coach.html) - Codio Virtual Coach configuration
+- [Jupyter Extension](https://docs.codio.com/common/develop/ide/editing/jupyter.html) - Required extension for Jupyter context
+
+### Working Examples
+- [eCornell JupyterLab Summarize Assistant](https://github.com/codio-extensions/eCornell-JupyterLab-Summarize-Assistant) - Working example we based our implementation on
+- [eCornell JupyterLab Error Explanation](https://github.com/codio-extensions/eCornell-JupyterLab-Error-Explanation-Assistant) - Another Jupyter coach example
+- [Coach Templates](https://github.com/codio-extensions) - All official Codio coach extensions
 
 ---
 

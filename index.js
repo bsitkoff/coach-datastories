@@ -111,22 +111,30 @@ Your students are learning to:
     // Build context string to include in first message
     let contextInfo = ""
 
-    // Add files from context if available
-    if (context.files && Object.keys(context.files).length > 0) {
+    // Add files from context if available (files is an array of {path, content} objects)
+    if (context.files && Array.isArray(context.files) && context.files.length > 0) {
       contextInfo += "\n\n## Student's Files:\n"
-      for (const [filename, content] of Object.entries(context.files)) {
-        contextInfo += `\n### ${filename}\n\`\`\`\n${content}\n\`\`\`\n`
+      for (const file of context.files) {
+        if (file.content) {
+          // Skip very large files to avoid token limits, truncate if needed
+          const maxLength = 10000
+          if (file.content.length <= maxLength) {
+            contextInfo += `\n### ${file.path}\n\`\`\`\n${file.content}\n\`\`\`\n`
+          } else {
+            contextInfo += `\n### ${file.path}\n(File truncated - first ${maxLength} chars)\n\`\`\`\n${file.content.substring(0, maxLength)}\n...\n\`\`\`\n`
+          }
+        }
       }
     }
 
     // Add assignment data if available
     if (context.assignmentData) {
-      contextInfo += "\n\n## Assignment Context:\n" + context.assignmentData
+      contextInfo += "\n\n## Assignment Context:\n" + JSON.stringify(context.assignmentData)
     }
 
     // Add guides page if available
-    if (context.guidesPage) {
-      contextInfo += "\n\n## Guide Content:\n" + context.guidesPage
+    if (context.guidesPage && context.guidesPage.content) {
+      contextInfo += "\n\n## Guide Content:\n" + context.guidesPage.content
     }
 
     // Add CSV files list

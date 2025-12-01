@@ -57,15 +57,28 @@ Your students are learning to:
 - Give specific code they can copy and paste, not just general advice
 - Explain why code works, not just what to type`
   
-  // Try to read actual notebook and data files
+  // Configuration
+  const DEBUG_MODE = true  // Set to true to see debug output
+
+  // Try to read actual notebook and data files from workspace
   async function tryGetWorkspaceFiles() {
     let filesContext = ""
 
     try {
+      // Check if workspace API is available
+      if (!codioIDE.workspace || !codioIDE.workspace.getFileTree) {
+        if (DEBUG_MODE) {
+          codioIDE.coachBot.write("**DEBUG - workspace.getFileTree() not available, skipping direct file read**")
+        }
+        return filesContext
+      }
+
       const fileTree = await codioIDE.workspace.getFileTree()
       const relevantFiles = findRelevantFiles(fileTree)
 
-      codioIDE.coachBot.write(`**DEBUG - Found ${relevantFiles.length} relevant files:** ${relevantFiles.join(', ')}`)
+      if (DEBUG_MODE) {
+        codioIDE.coachBot.write(`**DEBUG - Found ${relevantFiles.length} relevant files:** ${relevantFiles.join(', ')}`)
+      }
 
       for (const filePath of relevantFiles) {
         try {
@@ -78,14 +91,20 @@ Your students are learning to:
             } else {
               filesContext += `\n\n### File: ${filePath} (truncated)\n\`\`\`\n${content.substring(0, maxLength)}\n...(truncated)\n\`\`\`\n`
             }
-            codioIDE.coachBot.write(`**DEBUG - Read ${filePath}: ${content.length} chars**`)
+            if (DEBUG_MODE) {
+              codioIDE.coachBot.write(`**DEBUG - Read ${filePath}: ${content.length} chars**`)
+            }
           }
         } catch (err) {
-          codioIDE.coachBot.write(`**DEBUG - Could not read ${filePath}: ${err.message}**`)
+          if (DEBUG_MODE) {
+            codioIDE.coachBot.write(`**DEBUG - Could not read ${filePath}: ${err.message}**`)
+          }
         }
       }
     } catch (error) {
-      codioIDE.coachBot.write(`**DEBUG - Error getting file tree: ${error.message}**`)
+      if (DEBUG_MODE) {
+        codioIDE.coachBot.write(`**DEBUG - Error getting file tree: ${error.message}**`)
+      }
     }
 
     return filesContext
@@ -115,7 +134,32 @@ Your students are learning to:
     return files
   }
 
-  // register(id: unique button id, name: name of button visible in Coach, function: function to call when button is clicked) 
+  // Build enhanced context with additional data files info
+  async function buildEnhancedContext(baseContext) {
+    let enhanced = {...baseContext}
+
+    try {
+      // Try to read workspace files directly (if API is available)
+      const workspaceFiles = await tryGetWorkspaceFiles()
+
+      if (workspaceFiles) {
+        enhanced.workspaceFiles = workspaceFiles
+      }
+
+      if (DEBUG_MODE) {
+        codioIDE.coachBot.write("**DEBUG - Enhanced context built successfully**")
+      }
+
+    } catch (error) {
+      if (DEBUG_MODE) {
+        codioIDE.coachBot.write(`**DEBUG - Could not enhance context: ${error.message}**`)
+      }
+    }
+
+    return enhanced
+  }
+
+  // register(id: unique button id, name: name of button visible in Coach, function: function to call when button is clicked)
   codioIDE.coachBot.register("iNeedHelpButton", "I have a question", onButtonPress)
 
   // function called when I have a question button is pressed
@@ -124,54 +168,13 @@ Your students are learning to:
     // Get context from Codio (includes files, guides, assignments)
     const context = await codioIDE.coachBot.getContext()
 
-    // DEBUG: Show what context we received
-    codioIDE.coachBot.write("**DEBUG - Context received:**")
-    codioIDE.coachBot.write("```json\n" + JSON.stringify(context, null, 2) + "\n```")
-
-    // Try to read workspace files directly (notebooks, CSV, python files)
-    codioIDE.coachBot.write("\n**DEBUG - Attempting to read workspace files directly...**")
-    const workspaceFiles = await tryGetWorkspaceFiles()
-
-    // Build context string to include in first message
-    let contextInfo = ""
-
-    // Add files from context if available (files is an array of {path, content} objects)
-    if (context.files && Array.isArray(context.files) && context.files.length > 0) {
-      contextInfo += "\n\n## Student's Files:\n"
-      for (const file of context.files) {
-        if (file.content) {
-          // Skip very large files to avoid token limits, truncate if needed
-          const maxLength = 10000
-          if (file.content.length <= maxLength) {
-            contextInfo += `\n### ${file.path}\n\`\`\`\n${file.content}\n\`\`\`\n`
-          } else {
-            contextInfo += `\n### ${file.path}\n(File truncated - first ${maxLength} chars)\n\`\`\`\n${file.content.substring(0, maxLength)}\n...\n\`\`\`\n`
-          }
-        }
-      }
+    if (DEBUG_MODE) {
+      codioIDE.coachBot.write("**DEBUG - Context received:**")
+      codioIDE.coachBot.write("```json\n" + JSON.stringify(context, null, 2) + "\n```")
     }
 
-    // Add assignment data if available
-    if (context.assignmentData) {
-      contextInfo += "\n\n## Assignment Context:\n" + JSON.stringify(context.assignmentData)
-    }
-
-    // Add guides page if available
-    if (context.guidesPage && context.guidesPage.content) {
-      contextInfo += "\n\n## Guide Content:\n" + context.guidesPage.content
-    }
-
-    // Add workspace files (notebooks, CSVs, Python files) that we read directly
-    if (workspaceFiles) {
-      contextInfo += "\n\n## Workspace Files:\n" + workspaceFiles
-    }
-
-    // DEBUG: Show what we're sending
-    if (contextInfo) {
-      codioIDE.coachBot.write("**DEBUG - Context info length:** " + contextInfo.length + " characters")
-    } else {
-      codioIDE.coachBot.write("**DEBUG - WARNING: No context info collected!**")
-    }
+    // Build enhanced context with additional workspace files
+    const enhancedContext = await buildEnhancedContext(context)
 
     // the messages object that will contain the user prompt and/or any assistant responses to be sent to the LLM - will also maintain history
     // Refer to Anthropic's guide on the messages API here: https://docs.anthropic.com/en/api/messages
@@ -187,21 +190,18 @@ Your students are learning to:
         break
       }
 
-      // On first message, include all context information
-      const userContent = messages.length === 0 && contextInfo
-        ? input + contextInfo
-        : input
-
+      // Add user input to messages
       messages.push({
           "role": "user",
-          "content": userContent
+          "content": input
       })
 
-      // Send the API request to the LLM with all prompts and messages
+      // Send the API request to the LLM with all prompts, messages, and context
       // Prevent menu: true keeps the loop going until gracefully exited
       const result = await codioIDE.coachBot.ask({
         systemPrompt: systemPrompt,
-        messages: messages
+        messages: messages,
+        context: enhancedContext
       }, {preventMenu: true})
 
       // Saving assistant response to maintain conversation history as context for next message

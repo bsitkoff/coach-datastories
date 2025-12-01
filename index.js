@@ -57,36 +57,62 @@ Your students are learning to:
 - Give specific code they can copy and paste, not just general advice
 - Explain why code works, not just what to type`
   
-  // Optional: Try to get CSV file list (but don't break if this fails)
-  async function tryGetCSVList() {
+  // Try to read actual notebook and data files
+  async function tryGetWorkspaceFiles() {
+    let filesContext = ""
+
     try {
-      const files = await codioIDE.workspace.getFileTree()
-      const csvFiles = findCsvFiles(files)
-      if (csvFiles.length > 0) {
-        return "\n\nAvailable CSV files in workspace: " + csvFiles.join(", ")
+      const fileTree = await codioIDE.workspace.getFileTree()
+      const relevantFiles = findRelevantFiles(fileTree)
+
+      codioIDE.coachBot.write(`**DEBUG - Found ${relevantFiles.length} relevant files:** ${relevantFiles.join(', ')}`)
+
+      for (const filePath of relevantFiles) {
+        try {
+          const content = await codioIDE.workspace.readFile(filePath)
+          const maxLength = 15000  // Limit per file
+
+          if (content && content.length > 0) {
+            if (content.length <= maxLength) {
+              filesContext += `\n\n### File: ${filePath}\n\`\`\`\n${content}\n\`\`\`\n`
+            } else {
+              filesContext += `\n\n### File: ${filePath} (truncated)\n\`\`\`\n${content.substring(0, maxLength)}\n...(truncated)\n\`\`\`\n`
+            }
+            codioIDE.coachBot.write(`**DEBUG - Read ${filePath}: ${content.length} chars**`)
+          }
+        } catch (err) {
+          codioIDE.coachBot.write(`**DEBUG - Could not read ${filePath}: ${err.message}**`)
+        }
       }
     } catch (error) {
-      // Silently fail - this is optional context
+      codioIDE.coachBot.write(`**DEBUG - Error getting file tree: ${error.message}**`)
     }
-    return ""
+
+    return filesContext
   }
 
-  // Helper to find CSV files in file tree
-  function findCsvFiles(fileTree, path = '') {
-    let csvFiles = []
+  // Find relevant files (notebooks, python files, CSVs)
+  function findRelevantFiles(fileTree, path = '') {
+    let files = []
 
     if (fileTree.children) {
       for (const item of fileTree.children) {
         const fullPath = path ? `${path}/${item.name}` : item.name
-        if (item.type === 'file' && item.name.toLowerCase().endsWith('.csv')) {
-          csvFiles.push(fullPath)
-        } else if (item.type === 'directory') {
-          csvFiles = csvFiles.concat(findCsvFiles(item, fullPath))
+
+        if (item.type === 'file') {
+          const lower = item.name.toLowerCase()
+          // Include notebooks, python files, and CSVs (but skip hidden files)
+          if (!item.name.startsWith('.') &&
+              (lower.endsWith('.ipynb') || lower.endsWith('.py') || lower.endsWith('.csv'))) {
+            files.push(fullPath)
+          }
+        } else if (item.type === 'directory' && !item.name.startsWith('.')) {
+          files = files.concat(findRelevantFiles(item, fullPath))
         }
       }
     }
 
-    return csvFiles
+    return files
   }
 
   // register(id: unique button id, name: name of button visible in Coach, function: function to call when button is clicked) 
@@ -102,11 +128,9 @@ Your students are learning to:
     codioIDE.coachBot.write("**DEBUG - Context received:**")
     codioIDE.coachBot.write("```json\n" + JSON.stringify(context, null, 2) + "\n```")
 
-    // Build additional context with CSV files
-    const csvList = await tryGetCSVList()
-
-    // DEBUG: Show CSV list
-    codioIDE.coachBot.write("**DEBUG - CSV files found:** " + (csvList || "none"))
+    // Try to read workspace files directly (notebooks, CSV, python files)
+    codioIDE.coachBot.write("\n**DEBUG - Attempting to read workspace files directly...**")
+    const workspaceFiles = await tryGetWorkspaceFiles()
 
     // Build context string to include in first message
     let contextInfo = ""
@@ -137,9 +161,9 @@ Your students are learning to:
       contextInfo += "\n\n## Guide Content:\n" + context.guidesPage.content
     }
 
-    // Add CSV files list
-    if (csvList) {
-      contextInfo += csvList
+    // Add workspace files (notebooks, CSVs, Python files) that we read directly
+    if (workspaceFiles) {
+      contextInfo += "\n\n## Workspace Files:\n" + workspaceFiles
     }
 
     // DEBUG: Show what we're sending

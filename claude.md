@@ -7,6 +7,39 @@ Custom Codio coach assistant for middle school students learning data science wi
 
 ---
 
+## Session: December 2, 2025
+
+### Critical Bug Fix: Jupyter Cell Content Not Loading
+
+**Problem:**
+The coach was receiving Jupyter notebook context correctly, but wasn't showing the cell content to the LLM. Debug output showed:
+```
+**DEBUG - Enhanced context built: 353 chars**
+```
+This was only headers - no actual code or markdown content from cells.
+
+**Root Cause:**
+The code was reading `cell.source` but Codio's jupyterContext API uses `cell.content`:
+```javascript
+// WRONG:
+contextInfo += `\n### Cell ${index + 1} (${cell.type}):\n\`\`\`\n${cell.source || ''}\n\`\`\`\n`
+
+// CORRECT:
+contextInfo += `\n### Cell ${index + 1} (${cell.type}):\n\`\`\`\n${cell.content || ''}\n\`\`\`\n`
+```
+
+**The Fix:**
+Changed line 164 in `index.js` from `cell.source` to `cell.content`.
+
+**Impact:**
+- Before: Coach couldn't see any notebook code, gave generic responses
+- After: Coach can see all cell content and provide specific, targeted help
+
+**Verification:**
+After the fix, debug output should show much larger context (thousands of chars instead of just 353).
+
+---
+
 ## Session: December 1, 2025
 
 ### Problem Encountered
@@ -207,6 +240,107 @@ With DEBUG_MODE enabled, you'll now see:
 - **index.js** - Main coach implementation
 - **metadata.json** - Coach metadata (name, type, properties)
 - **claude.md** - This documentation file
+
+---
+
+## Deployment & GitHub Workflow
+
+### Repository Information
+- **GitHub Repository:** git@github.com:bsitkoff/coach-datastories.git
+- **Latest Release:** https://github.com/bsitkoff/coach-datastories/releases/tag/v1.0.6
+- **Authentication:** SSH with GITHUB_TOKEN environment variable
+
+### Files to Push
+Only push the coach files from the `coach-datastories-repo/` directory:
+- `index.js` - Main coach implementation
+- `metadata.json` - Coach metadata
+- `claude.md` - Development documentation
+
+**Do NOT push:**
+- Files from the parent `/home/codio/workspace/` directory
+- `ds_helpers.py`, `evictions.csv`, `data_stories_milestone_mild.ipynb` (these are workspace files, not coach files)
+
+### Standard Git Workflow
+
+**1. Navigate to the coach directory:**
+```bash
+cd /home/codio/workspace/coach-datastories-repo
+```
+
+**2. Check status and see what changed:**
+```bash
+git status
+git diff
+```
+
+**3. Add changes (only coach files):**
+```bash
+# Add specific files
+git add index.js metadata.json claude.md
+
+# Or add all changes in the coach directory
+git add .
+```
+
+**4. Commit with descriptive message:**
+```bash
+git commit -m "Brief description of changes"
+```
+
+**5. Push to GitHub:**
+```bash
+git push origin main
+```
+
+### Using the GITHUB_TOKEN Environment Variable
+
+The environment has a `GITHUB_TOKEN` variable configured for authentication:
+```bash
+echo $GITHUB_TOKEN  # Verify token is set
+```
+
+If you need to use HTTPS instead of SSH, configure the remote:
+```bash
+# Switch to HTTPS with token authentication
+git remote set-url origin https://${GITHUB_TOKEN}@github.com/bsitkoff/coach-datastories.git
+
+# Or switch back to SSH
+git remote set-url origin git@github.com:bsitkoff/coach-datastories.git
+```
+
+### Common Workflows
+
+**Quick commit and push:**
+```bash
+cd /home/codio/workspace/coach-datastories-repo
+git add .
+git commit -m "Update coach functionality"
+git push origin main
+```
+
+**Check remote configuration:**
+```bash
+git remote -v
+```
+
+**View commit history:**
+```bash
+git log --oneline -10
+```
+
+**Create a new release tag:**
+```bash
+git tag -a v1.0.7 -m "Release version 1.0.7"
+git push origin v1.0.7
+```
+
+### Important Notes
+
+- The repository uses **SSH authentication** by default (git@github.com)
+- The `GITHUB_TOKEN` environment variable is available if needed for HTTPS
+- Always work within `/home/codio/workspace/coach-datastories-repo/` directory
+- The parent workspace directory is NOT part of the git repository
+- Verify you're in the correct directory before committing: `pwd` should show `/home/codio/workspace/coach-datastories-repo`
 
 ---
 

@@ -161,7 +161,7 @@ Your students are learning to:
           // Extract code and markdown cells
           cells.forEach((cell, index) => {
             if (cell.type === 'code' || cell.type === 'markdown') {
-              contextInfo += `\n### Cell ${index + 1} (${cell.type}):\n\`\`\`\n${cell.source || ''}\n\`\`\`\n`
+              contextInfo += `\n### Cell ${index + 1} (${cell.type}):\n\`\`\`\n${cell.content || ''}\n\`\`\`\n`
             }
           })
         }

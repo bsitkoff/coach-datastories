@@ -38,6 +38,33 @@ Changed line 164 in `index.js` from `cell.source` to `cell.content`.
 **Verification:**
 After the fix, debug output should show much larger context (thousands of chars instead of just 353).
 
+### Second Fix: Context Not Visible to LLM
+
+**Problem:**
+Even after fixing cell.content, the LLM still couldn't see the notebook content. The context was building correctly (2452 chars) but the LLM responded as if it had no access to the notebook.
+
+**Root Cause:**
+We were passing `enhancedContext.notebookContext` as a custom property in the context parameter, but the Codio Coach API doesn't expose custom properties to the LLM. The LLM only sees the standard context properties (guidesPage, assignmentData, jupyterContext, files).
+
+**The Fix:**
+Append the notebook content to the first user message so it's directly in the conversation history:
+```javascript
+// On first message, append notebook context so LLM can see it
+const userContent = messages.length === 0 && enhancedContext.notebookContext
+  ? input + "\n\n---\n\n**CONTEXT: Student's Open Notebook**\n" + enhancedContext.notebookContext
+  : input
+
+messages.push({
+  "role": "user",
+  "content": userContent
+})
+```
+
+**Impact:**
+- Context is now in the message history where the LLM can definitely see it
+- Only sent on first message to save tokens
+- LLM can reference the notebook throughout the conversation
+
 ---
 
 ## Session: December 1, 2025

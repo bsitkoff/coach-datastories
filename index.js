@@ -230,10 +230,15 @@ Your students are learning to:
         break
       }
 
+      // On first message, append notebook context so LLM can see it
+      const userContent = messages.length === 0 && enhancedContext.notebookContext
+        ? input + "\n\n---\n\n**CONTEXT: Student's Open Notebook**\n" + enhancedContext.notebookContext
+        : input
+
       // Add user input to messages
       messages.push({
           "role": "user",
-          "content": input
+          "content": userContent
       })
 
       // Send the API request to the LLM with all prompts, messages, and context

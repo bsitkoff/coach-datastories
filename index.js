@@ -58,7 +58,7 @@ Your students are learning to:
 - Explain why code works, not just what to type`
   
   // Configuration
-  const DEBUG_MODE = true  // Set to true to see debug output
+  const DEBUG_MODE = false  // Set to true to see debug output
 
   // Try to read actual notebook and data files from workspace
   async function tryGetWorkspaceFiles() {

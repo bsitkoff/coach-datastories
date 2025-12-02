@@ -9,6 +9,31 @@ Custom Codio coach assistant for middle school students learning data science wi
 
 ## Session: December 2, 2025
 
+### Summary: Coach Now Fully Functional ✅
+
+The Data Stories Coach is now working correctly! Students can click "I have a question" with a Jupyter notebook open, and the coach will see all their code and provide specific, targeted help.
+
+**What was fixed:**
+1. Changed `cell.source` to `cell.content` to properly read Jupyter cells from Codio's API
+2. Appended notebook context to first user message so LLM can actually see it
+3. Added comprehensive deployment documentation
+4. DEBUG_MODE now set to `false` for production use
+
+**How it works:**
+1. Student opens a Jupyter notebook (e.g., explore.ipynb)
+2. Student clicks "I have a question" button
+3. Coach extracts all cells (code and markdown) from open notebooks
+4. On first message, appends notebook context to user input
+5. LLM sees the full notebook and provides specific guidance
+6. Conversation continues with context in message history
+
+**Files ready for deployment:**
+- ✅ index.js (DEBUG_MODE = false)
+- ✅ metadata.json
+- ✅ claude.md (comprehensive documentation)
+
+---
+
 ### Critical Bug Fix: Jupyter Cell Content Not Loading
 
 **Problem:**
@@ -368,6 +393,79 @@ git push origin v1.0.7
 - Always work within `/home/codio/workspace/coach-datastories-repo/` directory
 - The parent workspace directory is NOT part of the git repository
 - Verify you're in the correct directory before committing: `pwd` should show `/home/codio/workspace/coach-datastories-repo`
+
+---
+
+## Troubleshooting
+
+### Enabling Debug Mode
+
+If the coach isn't working as expected, enable debug mode to see diagnostic information:
+
+**File:** `index.js:61`
+```javascript
+const DEBUG_MODE = true  // Change false to true
+```
+
+**What you'll see:**
+- `**DEBUG - Context received:**` - Full JSON of context from Codio API
+- `**DEBUG - Found N open Jupyter notebook(s)**` - Number of open notebooks detected
+- `**DEBUG - Notebook 0: path with N cells**` - Each notebook's path and cell count
+- `**DEBUG - Enhanced context built: N chars**` - Size of context being sent to LLM
+- `**DEBUG - workspace.getFileTree() not available**` - If workspace API is unavailable
+
+**Expected values when working correctly:**
+- Open notebooks detected: ≥ 1
+- Context size: 2000-5000+ chars (depending on notebook size)
+- If context is < 500 chars, cells aren't being extracted properly
+
+### Common Issues
+
+**Issue:** "Please open a Jupyter notebook first!"
+- **Cause:** No notebooks are open in the IDE
+- **Fix:** Student must open a .ipynb file before clicking coach button
+
+**Issue:** Coach gives generic responses like "I don't have access to your notebook"
+- **Cause:** Context not being passed to LLM correctly
+- **Fix:** Check that notebook context is appended to first user message (lines 233-236)
+- **Debug:** Enable DEBUG_MODE and check context size
+
+**Issue:** "workspace.getFileTree() not available"
+- **Cause:** Codio workspace API is unavailable in current environment
+- **Impact:** Coach can still work using jupyterContext from getContext()
+- **Fix:** No fix needed - this is expected behavior, not an error
+
+**Issue:** Cell content is empty
+- **Cause:** Using wrong property name (cell.source vs cell.content)
+- **Fix:** Verify line 164 uses `cell.content`, not `cell.source`
+
+### Verifying the Fix
+
+After making changes, verify everything works:
+
+1. **Syntax check:**
+   ```bash
+   node -c index.js
+   ```
+
+2. **Test with DEBUG_MODE = true:**
+   - Open a Jupyter notebook in Codio
+   - Click "I have a question"
+   - Verify context size is > 2000 chars
+   - Ask "Tell me about my notebook"
+   - Coach should describe specific cells
+
+3. **Disable debug mode for production:**
+   ```bash
+   # Set DEBUG_MODE = false in index.js:61
+   ```
+
+4. **Commit and push:**
+   ```bash
+   git add index.js claude.md
+   git commit -m "Description of changes"
+   git push origin main
+   ```
 
 ---
 
